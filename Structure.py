@@ -167,10 +167,10 @@ class Trajectoire:
         PTF[0,5] = self.Delta_Trajectoire[0,1] + PTF[0,1] # Delta du PTF initial
 
         step = 0
-        texte:str= f"Etape {step} / Prime {PTF[step,3]} / Delta Option {self.Delta_Trajectoire[step,1]} / Prix SJ {self.Trajectoire[step]} \n"
-        texte += f'Hedging Done \n'
-        texte += f'Q SJ : {PTF[step,1]} / Cash PTF : {PTF[step,2]} / Valeur PTF : {PTF[step,4]} / Delta PTF : {PTF[step,5]} \n _'
-        print(texte)
+        #texte:str= f"Etape {step} / Prime {PTF[step,3]} / Delta Option {self.Delta_Trajectoire[step,1]} / Prix SJ {self.Trajectoire[step]} \n"
+        #texte += f'Hedging Done \n'
+        #texte += f'Q SJ : {PTF[step,1]} / Cash PTF : {PTF[step,2]} / Valeur PTF : {PTF[step,4]} / Delta PTF : {PTF[step,5]} \n _'
+        #print(texte)
 
         # Boucle pour chaque étape de la trajectoire    
         for step in range(1, self.ENV.Steps + 1, 1):
@@ -178,21 +178,21 @@ class Trajectoire:
             PTF[step,0] = step * self.ENV.dt  # Temps
             PTF[step,3] = self.Prime_Trajectoire[step,1]
 
-            texte:str= f"Etape {step} / Prime {PTF[step,3]} / Delta Option {self.Delta_Trajectoire[step,1]} / Prix SJ {self.Trajectoire[step]} \n"
+            #texte:str= f"Etape {step} / Prime {PTF[step,3]} / Delta Option {self.Delta_Trajectoire[step,1]} / Prix SJ {self.Trajectoire[step]} \n"
 
             if step % int(self.ENV.Periodicite_Hedge * self.ENV.Steps) == 0: # Périodicité de la couverture
                 expected_delta = self.Delta_Trajectoire[step,1] + PTF[step,1] # Delta attendu du PTF
                 hedging_size = expected_delta + PTF[step - 1,1] # Delta du PTF à couvrir
 
-                texte += f'Expected Delta : {expected_delta} / Hedging Size : {hedging_size} \n'
+                #texte += f'Expected Delta : {expected_delta} / Hedging Size : {hedging_size} \n'
 
                 PTF[step,1] = PTF[step - 1,1] - hedging_size  # Quantité d'actif sous-jacent
                 PTF[step,2] = PTF[step - 1,2] + hedging_size * self.Trajectoire[step] # Cash PTF
                 PTF[step,4] = PTF[step,2] + PTF[step,1] * self.Trajectoire[step] + PTF[step,3] - PTF[0,3]  # Valeur du PTF
                 PTF[step,5] = self.Delta_Trajectoire[step,1] + PTF[step,1]  # Delta du PTF  
 
-                texte += f'Hedging Done \n'
-                texte += f'Q SJ : {PTF[step,1]} / Cash PTF : {PTF[step,2]} / Valeur PTF : {PTF[step,4]} / Delta PTF : {PTF[step,5]} \n _'
+                #texte += f'Hedging Done \n'
+                #texte += f'Q SJ : {PTF[step,1]} / Cash PTF : {PTF[step,2]} / Valeur PTF : {PTF[step,4]} / Delta PTF : {PTF[step,5]} \n _'
 
             else: # Pas de couverture si pas de période de couverture
                 PTF[step,1] = PTF[step - 1,1] # Quantité d'actif sous-jacent
@@ -200,8 +200,8 @@ class Trajectoire:
                 PTF[step,4] = PTF[step,2] + PTF[step,1] * self.Trajectoire[step] + PTF[step,3] - PTF[0,3]  # Valeur du PTF 
                 PTF[step,5] = self.Delta_Trajectoire[step,1] + PTF[step,1] # Delta du PTF
                 
-                texte += f'No Hedging \n'
-                texte += f'Q SJ : {PTF[step,1]} / Cash PTF : {PTF[step,2]} / Valeur PTF : {PTF[step,4]} / Delta PTF : {PTF[step,5]} \n _'
+                #texte += f'No Hedging \n'
+                #texte += f'Q SJ : {PTF[step,1]} / Cash PTF : {PTF[step,2]} / Valeur PTF : {PTF[step,4]} / Delta PTF : {PTF[step,5]} \n _'
             
-            print(texte)
+            #print(texte)
         self.DetlaHedging_Matrice = PTF
