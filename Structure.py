@@ -12,6 +12,21 @@ def phi(x):
 
     return (1.0 + erf(x / sqrt(2.0))) / 2.0
 
+def Cost_Function(Cout_Hedge:float, Quantite:float) -> float:
+
+    """
+    Fonction de coût de la couverture delta
+    Cout_Hedge: Coût de la couverture
+    Quantite: Quantité d'actif sous-jacent
+    """
+
+    if Quantite > 0:
+        return Quantite * (1 + Cout_Hedge)  # Coût de la couverture pour une position longue
+    elif Quantite <= 0:
+        return Quantite * (1 - Cout_Hedge)  
+    else:
+        raise ValueError("Quantité must be non-zero")  # Pas de coût si pas de position
+
 class Environnement_Modelisation:
     def __init__(self, T:float, Steps:int, Cout_Hedge:float, Periodicite_Hedge:float) -> None:
         self.Residual_Maturity = T # Maturité résiduelle de l'option
@@ -22,6 +37,44 @@ class Environnement_Modelisation:
         
 
 class BlackSchole_Modele:
+
+    @staticmethod
+    def Option_Price(OptionType:Literal["Call", "Put"],S0:float, K:float, T:float, r:float, q:float, sigma:float, round_nb:int=2) -> float:
+        
+        """
+        Calcule le prix de l'option selon le modèle de Black-Scholes
+        """
+
+        d1:float = log(S0 / K) + (r - q + 0.5 * (sigma ** 2)) * T
+        d1 /= sigma * sqrt(T)
+        d2:float = d1 - sigma * sqrt(T)
+
+        if OptionType == "Call":
+            Price:float = S0 * exp(-q * T) * phi(d1) - K * exp(-r * T) * phi(d2)
+            Price = round(Price, round_nb)
+            return Price
+        elif OptionType == "Put":
+            Price = - S0 * exp(-q * T) * phi(-d1) + K * exp(-r * T) * phi(-d2)
+            Price = round(Price, round_nb)
+            return Price
+        else:
+            raise ValueError("OptionType must be 'Call' or 'Put'")
+        
+    @staticmethod
+    def Option_Delta(OptionType:Literal["Call", "Put"],Spot:float, K:float, T:float, r:float, q:float, sigma:float, round_nb:int=2) -> float:
+
+        """ Calcule le delta de l'option selon le modèle de Black-Scholes """
+
+        d1:float = log(Spot / K) + (r - q + 0.5 * (sigma ** 2)) * T
+        d1 /= sigma * sqrt(T)
+
+        if OptionType == "Call":
+            return round(exp(-q * T) * phi(d1), round_nb)
+        elif OptionType == "Put":
+            return round(-exp(-q * T) * (phi(-d1)), round_nb)
+        else:
+            raise ValueError("OptionType must be 'Call' or 'Put'")
+
     def __init__(self, OptionType:Literal["Call", "Put"],S0:float, K:float, T:float, r:float, q:float, sigma:float, round:int=2) -> None:
         self.OptionType:Literal["Call", "Put"] = OptionType
         self.S0:float = S0  # Prix initial de l'actif
@@ -30,43 +83,11 @@ class BlackSchole_Modele:
         self.q:float = q    # Taux de dividende de l'actif
         self.r:float = r    # Taux d'intérêt sans risque
         self.sigma:float = sigma  # Volatilité de l'actif
-        self.Price:float
+        self.Price:float = self.Option_Price(OptionType, S0, K, T, r, q, sigma)  # Prix de l'option
+        self.Delta:float = self.Option_Delta(OptionType, S0, K, T, r, q, sigma)  # Delta de l'option
         self.round:int = round
 
-    def Option_Price(self) -> None:
-        
-        """
-        Calcule le prix de l'option selon le modèle de Black-Scholes
-        """
-
-        d1:float = log(self.S0 / self.K) + (self.r - self.q + 0.5 * (self.sigma ** 2)) * self.T
-        d1 /= self.sigma * sqrt(self.T)
-        d2:float = d1 - self.sigma * sqrt(self.T)
-
-        if self.OptionType == "Call":
-            self.Price = self.S0 * exp(-self.q * self.T) * phi(d1) - self.K * exp(-self.r * self.T) * phi(d2)
-            self.Price = round(self.Price, self.round)
-        elif self.OptionType == "Put":
-            self.Price = - self.S0 * exp(-self.q * self.T) * phi(-d1) + self.K * exp(-self.r * self.T) * phi(-d2)
-            self.Price = round(self.Price, self.round)
-        else:
-            raise ValueError("OptionType must be 'Call' or 'Put'")
-
-
-    def Option_Delta(self, Spot:float, T_residuel:float) -> float:
-
-        """ Calcule le delta de l'option selon le modèle de Black-Scholes """
-
-        d1:float = log(Spot / self.K) + (self.r - self.q + 0.5 * (self.sigma ** 2)) * T_residuel
-        d1 /= self.sigma * sqrt(T_residuel)
-
-        if self.OptionType == "Call":
-            return round(exp(-self.q * T_residuel) * phi(d1), self.round)
-        elif self.OptionType == "Put":
-            return round(-exp(-self.q * T_residuel) * (phi(-d1)), self.round)
-        else:
-            raise ValueError("OptionType must be 'Call' or 'Put'")
-        
+    
 class Trajectoire:
     def __init__(self, ENV: Environnement_Modelisation, Option: BlackSchole_Modele, seed:int=10) -> None:
         self.ENV:Environnement_Modelisation = ENV
@@ -74,6 +95,7 @@ class Trajectoire:
         self.Random:ndarray
         self.Trajectoire:ndarray
         self.Delta_Trajectoire:ndarray
+        self.Prime_Trajectoire:ndarray
         self.seed = seed
         self.DetlaHedging_Matrice:ndarray
         self.GenerationRandom(self.seed)
@@ -92,13 +114,37 @@ class Trajectoire:
         self.Trajectoire = round(self.Trajectoire, self.Option.round)
 
     def GenerationDelta_Trajectoire(self) -> None:
+
+        """
+        Calcule le delta de l'option pour chaque étape de la trajectoire
+        """
+
         self.Delta_Trajectoire = zeros((self.ENV.Steps + 1, 2))
         for step in range(0, self.ENV.Steps + 1):
-            delta_tmp:float = self.Option.Option_Delta(self.Trajectoire[step], self.ENV.Residual_Maturity - (step * self.ENV.dt))
+            delta_tmp:float = self.Option.Option_Delta(OptionType = self.Option.OptionType, Spot = self.Trajectoire[step],
+                                                       K = self.Option.K, T = self.ENV.Residual_Maturity - (step * self.ENV.dt),
+                                                       r = self.Option.r, q = self.Option.q, 
+                                                       sigma = self.Option.sigma,round_nb = self.Option.round)
             self.Delta_Trajectoire[step,0] = step * self.ENV.dt
             self.Delta_Trajectoire[step,1] = round(delta_tmp,self.Option.round)
             del delta_tmp
         
+    def GeneratioPrime_Trajectoire(self) -> None:
+
+        """
+        Calcule la prime de l'option pour chaque étape de la trajectoire
+        """
+
+        self.Prime_Trajectoire = zeros((self.ENV.Steps + 1, 2))
+        for step in range(0, self.ENV.Steps + 1):
+            prime_tmp:float = self.Option.Option_Price(OptionType = self.Option.OptionType, S0 = self.Trajectoire[step],
+                                                       K = self.Option.K, T = self.ENV.Residual_Maturity - (step * self.ENV.dt),
+                                                       r = self.Option.r, q = self.Option.q, 
+                                                       sigma = self.Option.sigma, round_nb = self.Option.round)
+            self.Prime_Trajectoire[step,0] = step * self.ENV.dt
+            self.Prime_Trajectoire[step,1] = round(prime_tmp,self.Option.round)
+            del prime_tmp
+
     def DeltaHedge(self) -> None:
 
         """
@@ -107,25 +153,8 @@ class Trajectoire:
 
         PTF = zeros((self.ENV.Steps + 1, 4))
 
-        PTF[0, 0] = 0 # Col0 = Temps
-        PTF[0, 1] = -self.Option.Option_Delta(self.Option.S0, self.ENV.Residual_Maturity) # Col1 = Quantité actif sous-jacent
-        PTF[0, 2] = - self.Option.Price - PTF[0, 1] * self.Option.S0 # Col2 = Valeur du portefeuille
-        PTF[0, 3] = self.Option.Option_Delta(self.Option.S0, self.ENV.Residual_Maturity) + PTF[0, 1] # Col3 = Delta du portefeuille
-
-        print(f'En période {0} \n delta option {self.Delta_Trajectoire[0, 1]} \n quantité sous-jacent {PTF[0, 1]} \n valeur du portefeuille {PTF[0, 2]} \n delta portefeuille {PTF[0, 3]}')
-
+        
         for step in range(1, self.ENV.Steps + 1, 1):
-
-            PTF[step, 0] = step * self.ENV.dt
-            Var_Delta = self.Delta_Trajectoire[step, 1] - self.Delta_Trajectoire[step - 1, 1] 
-
-            if step % self.ENV.Periodicite_Hedge * self.ENV.Steps != 0 or True: # Si on ne hedge pas à cette période
-                
-                PTF[step, 1] = PTF[step - 1, 1] # Quantité sous-jacent inchangée
-                PTF[step, 2] = PTF[step - 1, 2] +  PTF[step - 1, 1] * (self.Trajectoire[step] - self.Trajectoire[step - 1]) # Valeur du portefeuille 
-                PTF[step, 3] = PTF[step - 1, 3] + Var_Delta
-                
+            pass
             
-            print(f'En période {step} \n delta option {self.Delta_Trajectoire[step, 1]} \n quantité sous-jacent {PTF[step, 1]} | Prix action {self.Trajectoire[step] } \n valeur du portefeuille {PTF[step, 2]} \n delta portefeuille {PTF[step, 3]}')
-            
-        self.DetlaHedging_Matrice = PTF
+        
