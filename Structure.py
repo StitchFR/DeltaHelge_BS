@@ -27,6 +27,10 @@ def Cost_Function(Cout_Hedge:float, Prix:float, Sens:Literal["Buy", "Sell"]) -> 
     else:
         raise ValueError("Sens must be 'Buy' or 'Sell'") # Pas de coût si pas de position
 
+def TextPolice(texte:str, size:int=12) -> str:
+    return f"<span style='font-size:{size}px;'>{texte}</span>"
+
+
 class Environnement_Modelisation:
     def __init__(self, T:float, Steps:int, Cout_Hedge:float, Periodicite_Hedge:float) -> None:
         self.Residual_Maturity = T # Maturité résiduelle de l'option
@@ -102,6 +106,7 @@ class Trajectoire:
         self.GenerationTrajectoire()
         self.GenerationDelta_Trajectoire()
         self.GeneratioPrime_Trajectoire()
+        self.DeltaHedge()
 
     def GenerationRandom(self, seed:int = 10) -> None:
         random.seed(seed)
