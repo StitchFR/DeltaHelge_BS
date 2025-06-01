@@ -101,6 +101,7 @@ class Trajectoire:
         self.GenerationRandom(self.seed)
         self.GenerationTrajectoire()
         self.GenerationDelta_Trajectoire()
+        self.GeneratioPrime_Trajectoire()
 
     def GenerationRandom(self, seed:int = 10) -> None:
         random.seed(seed)
