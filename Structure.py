@@ -12,20 +12,20 @@ def phi(x):
 
     return (1.0 + erf(x / sqrt(2.0))) / 2.0
 
-def Cost_Function(Cout_Hedge:float, Quantite:float) -> float:
+def Cost_Function(Cout_Hedge:float, Prix:float, Sens:Literal["Buy", "Sell"]) -> float:
 
     """
     Fonction de coût de la couverture delta
     Cout_Hedge: Coût de la couverture
-    Quantite: Quantité d'actif sous-jacent
+    Prix: Prix de l'actif sous-jacent
     """
 
-    if Quantite > 0:
-        return Quantite * (1 + Cout_Hedge)  # Coût de la couverture pour une position longue
-    elif Quantite <= 0:
-        return Quantite * (1 - Cout_Hedge)  
+    if Sens == "Buy":
+        return Prix * (1 + Cout_Hedge)  # Coût de la couverture à l'achat
+    elif Sens == "Sell":
+        return Prix * (1 - Cout_Hedge) # Coût de la couverture à la vente
     else:
-        raise ValueError("Quantité must be non-zero")  # Pas de coût si pas de position
+        raise ValueError("Sens must be 'Buy' or 'Sell'") # Pas de coût si pas de position
 
 class Environnement_Modelisation:
     def __init__(self, T:float, Steps:int, Cout_Hedge:float, Periodicite_Hedge:float) -> None:
@@ -152,10 +152,51 @@ class Trajectoire:
         Calcule la couverture delta de la position optionnelle selon les variations du sous-jacent
         """
 
-        PTF = zeros((self.ENV.Steps + 1, 4))
+        PTF = zeros((self.ENV.Steps + 1, 6))
 
-        
+        PTF[0,0] = 0  # Temps
+        PTF[0,1] = - self.Delta_Trajectoire[0,1]  # Quantité d'actif sous-jacent
+        PTF[0,2] = self.Delta_Trajectoire[0,1] *  self.Trajectoire[0]  # Cash PTF
+        PTF[0,3] = self.Prime_Trajectoire[0,1] # Prime de l'option
+        PTF[0,4] = PTF[0,2] + PTF[0,1] * self.Trajectoire[0] + PTF[0,3] - PTF[0,3] # Valeur du PTF initial
+        PTF[0,5] = self.Delta_Trajectoire[0,1] + PTF[0,1] # Delta du PTF initial
+
+        step = 0
+        texte:str= f"Etape {step} / Prime {PTF[step,3]} / Delta Option {self.Delta_Trajectoire[step,1]} / Prix SJ {self.Trajectoire[step]} \n"
+        texte += f'Hedging Done \n'
+        texte += f'Q SJ : {PTF[step,1]} / Cash PTF : {PTF[step,2]} / Valeur PTF : {PTF[step,4]} / Delta PTF : {PTF[step,5]} \n _'
+        print(texte)
+
+        # Boucle pour chaque étape de la trajectoire    
         for step in range(1, self.ENV.Steps + 1, 1):
-            pass
+
+            PTF[step,0] = step * self.ENV.dt  # Temps
+            PTF[step,3] = self.Prime_Trajectoire[step,1]
+
+            texte:str= f"Etape {step} / Prime {PTF[step,3]} / Delta Option {self.Delta_Trajectoire[step,1]} / Prix SJ {self.Trajectoire[step]} \n"
+
+            if step % int(self.ENV.Periodicite_Hedge * self.ENV.Steps) == 0: # Périodicité de la couverture
+                expected_delta = self.Delta_Trajectoire[step,1] + PTF[step,1] # Delta attendu du PTF
+                hedging_size = expected_delta + PTF[step - 1,1] # Delta du PTF à couvrir
+
+                texte += f'Expected Delta : {expected_delta} / Hedging Size : {hedging_size} \n'
+
+                PTF[step,1] = PTF[step - 1,1] - hedging_size  # Quantité d'actif sous-jacent
+                PTF[step,2] = PTF[step - 1,2] + hedging_size * self.Trajectoire[step] # Cash PTF
+                PTF[step,4] = PTF[step,2] + PTF[step,1] * self.Trajectoire[step] + PTF[step,3] - PTF[0,3]  # Valeur du PTF
+                PTF[step,5] = self.Delta_Trajectoire[step,1] + PTF[step,1]  # Delta du PTF  
+
+                texte += f'Hedging Done \n'
+                texte += f'Q SJ : {PTF[step,1]} / Cash PTF : {PTF[step,2]} / Valeur PTF : {PTF[step,4]} / Delta PTF : {PTF[step,5]} \n _'
+
+            else: # Pas de couverture si pas de période de couverture
+                PTF[step,1] = PTF[step - 1,1] # Quantité d'actif sous-jacent
+                PTF[step,2] = PTF[step - 1,2] # Cash PTF
+                PTF[step,4] = PTF[step,2] + PTF[step,1] * self.Trajectoire[step] + PTF[step,3] - PTF[0,3]  # Valeur du PTF 
+                PTF[step,5] = self.Delta_Trajectoire[step,1] + PTF[step,1] # Delta du PTF
+                
+                texte += f'No Hedging \n'
+                texte += f'Q SJ : {PTF[step,1]} / Cash PTF : {PTF[step,2]} / Valeur PTF : {PTF[step,4]} / Delta PTF : {PTF[step,5]} \n _'
             
-        
+            print(texte)
+        self.DetlaHedging_Matrice = PTF
