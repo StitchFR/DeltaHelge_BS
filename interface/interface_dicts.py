@@ -10,15 +10,14 @@ TITRES = {
 ST1= "Texte explique"
 
 LSTPRODUCTS = {
-    "P1": "Produit 1",
-    "P2": "Produit 2",
-    "P3": "Produit 3",}
+    "P1": "Call",
+    "P2": "Put",
+    "P3": "Twin win",}
 
 LSTPRODUCTS2 = {
-    "P1": "Produit 1",  
-    "P2": "Produit 2",
-    "P3": "Produit 3",
-    "P4": "Produit 4",
+    "P1": "Black Scholes",  
+    "P2": "Dupire (Local Volatility)",
+    "P3": "Heston (Stochastic Volatility)",
 }
 
 nomdelapage = "Pricer"
